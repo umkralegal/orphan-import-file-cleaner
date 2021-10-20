@@ -2,35 +2,39 @@ tool
 extends EditorPlugin
 
 
-var orphan_imports: Array = []
+var _orphan_imports: Array = []
 
-onready var orphan_viewer: ConfirmationDialog = null
+onready var confirmation_dialog: ConfirmationDialog = $ConfirmationDialog
+onready var accept_dialog: AcceptDialog = $AcceptDialog
 
 
 func _ready():
-	orphan_viewer = get_node("ConfirmationDialog")
-	orphan_viewer.connect("confirmed", self, "_on_ConfirmationDialog_confirmed")
+	confirmation_dialog.connect("confirmed", self, "_on_ConfirmationDialog_confirmed")
 
 
 func _enter_tree():
 	add_tool_menu_item("Orphan .import file cleaner", self, "_on_cleaner_pressed")
-	orphan_viewer = preload("./confirmation_dialog.tscn").instance()
-	add_child(orphan_viewer)
+	add_child(preload("./confirmation_dialog.tscn").instance())
+	add_child(preload("./accept_dialog.tscn").instance())
 
 
 func _exit_tree():
-	orphan_viewer.queue_free()
-	orphan_viewer = null
 	remove_tool_menu_item("Orphan .import file cleaner")
+	confirmation_dialog.free()
+	accept_dialog.free()
 
 
 func _on_cleaner_pressed(ub):
-	var item_list: ItemList = orphan_viewer.get_node("VBoxContainer/ScrollContainer/VBoxContainer/ItemList")
+	accept_dialog.rect_size = Vector2(83, 58)
+	accept_dialog.dialog_text = ""
+
+	var item_list: ItemList = confirmation_dialog.get_node("VBoxContainer/ScrollContainer/VBoxContainer/ItemList")
 	item_list.clear()
 
 	var found_files: Array = []
 	var dir: Directory = Directory.new()
 	var sub_directories: Array = ["res://"]
+
 	while sub_directories.size() > 0:
 		var path: String = sub_directories[0]
 		var err: int = dir.open(path)
@@ -46,29 +50,41 @@ func _on_cleaner_pressed(ub):
 				file_name = dir.get_next()
 			sub_directories.erase(path)
 		else:
-			printerr(err)
+			accept_dialog.dialog_text = "An error has occurred. Code: %d" % err
+			accept_dialog.popup_centered()
+			dir.list_dir_end()
+			return
+
 	dir.list_dir_end()
 
-	orphan_imports = []
+	_orphan_imports = []
 	for import_file in found_files:
 		if import_file.ends_with(".import"):
 			var original_file: String = import_file.rstrip(".import")
 			if not original_file in found_files:
-				orphan_imports.append(import_file)
+				_orphan_imports.append(import_file)
 
-	if not orphan_imports.empty():
-		for orphan_file in orphan_imports:
+	if not _orphan_imports.empty():
+		for orphan_file in _orphan_imports:
 			item_list.add_item(orphan_file)
-		orphan_viewer.popup_centered()
-		orphan_viewer.show()
+		confirmation_dialog.popup_centered()
 	else:
-		push_warning("No orphan .import files to delete.")
+		accept_dialog.dialog_text = "No orphan .import files to delete."
+		accept_dialog.popup_centered()
 
 
 func _on_ConfirmationDialog_confirmed():
 	var dir: Directory = Directory.new()
-	for file in orphan_imports:
+	var errors: Array = []
+	for file in _orphan_imports:
 		var err: int = dir.remove(file)
 		if not err == OK:
-			printerr("Couldn't remove ", file)
-	orphan_imports = []
+			errors.append("%s (Error code %d)" % [file, err])
+
+	_orphan_imports = []
+
+	if not errors.empty():
+		accept_dialog.dialog_text = "Could not remove the following files: \n"
+		for e in errors:
+			accept_dialog.dialog_text += e + " \n"
+		accept_dialog.popup_centered()

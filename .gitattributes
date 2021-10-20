@@ -1,2 +1,10 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalize EOL for all files that Git considers text files.
+* text=auto eol=lf
+
+# Ignore some files when exporting to a ZIP.
+/screenshots        export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/LICENSE            export-ignore
+/README.md          export-ignore
+/icon.png           export-ignore
