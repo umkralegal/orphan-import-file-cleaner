@@ -60,7 +60,7 @@ func _on_cleaner_pressed(ub):
 	_orphan_imports = []
 	for import_file in found_files:
 		if import_file.ends_with(".import"):
-			var original_file: String = import_file.rstrip(".import")
+			var original_file: String = import_file.trim_suffix(".import")
 			if not original_file in found_files:
 				_orphan_imports.append(import_file)
 
